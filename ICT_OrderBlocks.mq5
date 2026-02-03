@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Gemini AI"
 #property link      "https://www.google.com/"
-#property version   "6.06"
+#property version   "6.07"
 #property description "ICT Order Blocks - Delayed Deletion for Lines & Boxes"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -598,6 +598,15 @@ void ManageVisibility(CArrayObj &list, ENUM_TIMEFRAMES tf, int minMin, int maxMi
    for(int i=0; i<list.Total(); i++)
      {
       COrderBlock *ob = list.At(i);
+
+      // Safety: Mitigated boxes MUST be hidden/deleted immediately
+      if(ob.isMitigated && ob.visualType == OB_RECTANGLE)
+      {
+         ob.isVisible = false;
+         ob.isActive = false;
+         ob.DeleteObjects();
+         continue;
+      }
 
       if(forceHide)
         {
