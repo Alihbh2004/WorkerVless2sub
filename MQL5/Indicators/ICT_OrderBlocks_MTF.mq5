@@ -128,22 +128,27 @@ int GetChartMinutes()
 
 string CreateBox(datetime t1, double price1, datetime t2, double price2, color clr, string textStr, color txtColor, string namePrefix)
   {
-   static int counter = 0;
-   counter++;
-   string name = "ICT_OB_" + namePrefix + "_" + IntegerToString(GetTickCount()) + "_" + IntegerToString(counter);
-   if(ObjectCreate(0, name, OBJ_RECTANGLE, 0, t1, price1, t2, price2))
+   string name = "ICT_OB_" + namePrefix + "_" + IntegerToString(t1) + "_" + DoubleToString(price1, _Digits);
+   if(ObjectFind(0, name) == -1)
      {
-      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);      // Border color
-      ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
-      ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(0, name, OBJPROP_BACK, true);      // Background (filled) behind candles
-      ObjectSetInteger(0, name, OBJPROP_FILL, true);      // Enable fill
+      if(ObjectCreate(0, name, OBJ_RECTANGLE, 0, t1, price1, t2, price2))
+        {
+         ObjectSetInteger(0, name, OBJPROP_COLOR, clr);      // Border color
+         ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+         ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
+         ObjectSetInteger(0, name, OBJPROP_BACK, true);      // Background (filled) behind candles
+         ObjectSetInteger(0, name, OBJPROP_FILL, true);      // Enable fill
 
-      // Text properties (Note: Standard Rect doesn't fully support separate text color from border easily in all modes,
-      // but we set properties as requested)
-      ObjectSetString(0, name, OBJPROP_TEXT, textStr);
-      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
-      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+         ObjectSetString(0, name, OBJPROP_TEXT, textStr);
+         ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
+         ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+         return name;
+        }
+     }
+   else
+     {
+      // Update existing if needed (e.g., extend right side)
+      // Caller usually handles set_right equivalent
       return name;
      }
    return "";
@@ -151,14 +156,19 @@ string CreateBox(datetime t1, double price1, datetime t2, double price2, color c
 
 string CreateLine(datetime t1, double p1, datetime t2, double p2, color clr, int width, string namePrefix)
   {
-   static int counter = 0;
-   counter++;
-   string name = "ICT_OB_Ln_" + namePrefix + "_" + IntegerToString(GetTickCount()) + "_" + IntegerToString(counter);
-   if(ObjectCreate(0, name, OBJ_TREND, 0, t1, p1, t2, p2))
+   string name = "ICT_OB_Ln_" + namePrefix + "_" + IntegerToString(t1) + "_" + DoubleToString(p1, _Digits);
+   if(ObjectFind(0, name) == -1)
      {
-      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, name, OBJPROP_WIDTH, width);
-      ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
+      if(ObjectCreate(0, name, OBJ_TREND, 0, t1, p1, t2, p2))
+        {
+         ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+         ObjectSetInteger(0, name, OBJPROP_WIDTH, width);
+         ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
+         return name;
+        }
+     }
+   else
+     {
       return name;
      }
    return "";
@@ -166,15 +176,20 @@ string CreateLine(datetime t1, double p1, datetime t2, double p2, color clr, int
 
 string CreateLabel(datetime t, double p, string text, color clr, string namePrefix)
   {
-   static int counter = 0;
-   counter++;
-   string name = "ICT_OB_Lb_" + namePrefix + "_" + IntegerToString(GetTickCount()) + "_" + IntegerToString(counter);
-   if(ObjectCreate(0, name, OBJ_TEXT, 0, t, p))
+   string name = "ICT_OB_Lb_" + namePrefix + "_" + IntegerToString(t) + "_" + DoubleToString(p, _Digits);
+   if(ObjectFind(0, name) == -1)
      {
-      ObjectSetString(0, name, OBJPROP_TEXT, text);
-      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
-      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT);
+      if(ObjectCreate(0, name, OBJ_TEXT, 0, t, p))
+        {
+         ObjectSetString(0, name, OBJPROP_TEXT, text);
+         ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+         ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 8);
+         ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT);
+         return name;
+        }
+     }
+   else
+     {
       return name;
      }
    return "";
@@ -587,6 +602,14 @@ bool IsDuplicateMTF(MTF_OB &arr[], datetime t)
    return false;
   }
 
+// Helper to check if Local object exists
+bool IsDuplicateLocal(Local_OB &arr[], datetime t)
+  {
+   int s = ArraySize(arr);
+   if(s > 0 && arr[s-1].creation_time == t) return true;
+   return false;
+  }
+
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                         |
 //+------------------------------------------------------------------+
@@ -872,17 +895,12 @@ int OnCalculate(const int rates_total,
          for(int k = ArraySize(boxBull)-1; k>=0; k--) { if(boxBull[k].creation_time == time[i-1]) { idxA = k; break; } if(ArraySize(boxBull)-k > 5) break; }
 
          if(bullScenA) {
-             if(idxA == -1) {
+             if(idxA == -1 && !IsDuplicateLocal(boxBull, time[i-1])) {
                  // Create
                  Local_OB newLoc; newLoc.top = bTopA; newLoc.bottom = bBotA; newLoc.is_mitigated = false; newLoc.mitigation_idx = 0; newLoc.creation_time = time[i-1];
                  newLoc.id = CreateBox(time[i-1], bTopA, time[i], bBotA, currentBullColor, "ob-" + tfTxt, clrWhite, "Local_Bull");
                  if(ArraySize(boxBull) >= 50) { DeleteLocalOB(boxBull[0]); ArrayRemove(boxBull, 0, 1); }
                  ArrayResize(boxBull, ArraySize(boxBull)+1); boxBull[ArraySize(boxBull)-1] = newLoc;
-             }
-         } else {
-             if(idxA != -1) {
-                 DeleteLocalOB(boxBull[idxA]);
-                 ArrayRemove(boxBull, idxA, 1);
              }
          }
 
@@ -895,16 +913,11 @@ int OnCalculate(const int rates_total,
          for(int k = ArraySize(boxBull)-1; k>=0; k--) { if(boxBull[k].creation_time == time[i-2]) { idxB = k; break; } if(ArraySize(boxBull)-k > 5) break; }
 
          if(bullScenB) {
-             if(idxB == -1) {
+             if(idxB == -1 && !IsDuplicateLocal(boxBull, time[i-2])) {
                  Local_OB newLoc; newLoc.top = bTopB; newLoc.bottom = bBotB; newLoc.is_mitigated = false; newLoc.mitigation_idx = 0; newLoc.creation_time = time[i-2];
                  newLoc.id = CreateBox(time[i-2], bTopB, time[i], bBotB, currentBullColor, "ob-" + tfTxt, clrWhite, "Local_Bull");
                  if(ArraySize(boxBull) >= 50) { DeleteLocalOB(boxBull[0]); ArrayRemove(boxBull, 0, 1); }
                  ArrayResize(boxBull, ArraySize(boxBull)+1); boxBull[ArraySize(boxBull)-1] = newLoc;
-             }
-         } else {
-             if(idxB != -1) {
-                 DeleteLocalOB(boxBull[idxB]);
-                 ArrayRemove(boxBull, idxB, 1);
              }
          }
 
@@ -917,16 +930,11 @@ int OnCalculate(const int rates_total,
          for(int k = ArraySize(boxBear)-1; k>=0; k--) { if(boxBear[k].creation_time == time[i-1]) { idxRA = k; break; } if(ArraySize(boxBear)-k > 5) break; }
 
          if(bearScenA) {
-             if(idxRA == -1) {
+             if(idxRA == -1 && !IsDuplicateLocal(boxBear, time[i-1])) {
                  Local_OB newLoc; newLoc.top = rTopA; newLoc.bottom = rBotA; newLoc.is_mitigated = false; newLoc.mitigation_idx = 0; newLoc.creation_time = time[i-1];
                  newLoc.id = CreateBox(time[i-1], rTopA, time[i], rBotA, currentBearColor, "ob-" + tfTxt, clrWhite, "Local_Bear");
                  if(ArraySize(boxBear) >= 50) { DeleteLocalOB(boxBear[0]); ArrayRemove(boxBear, 0, 1); }
                  ArrayResize(boxBear, ArraySize(boxBear)+1); boxBear[ArraySize(boxBear)-1] = newLoc;
-             }
-         } else {
-             if(idxRA != -1) {
-                 DeleteLocalOB(boxBear[idxRA]);
-                 ArrayRemove(boxBear, idxRA, 1);
              }
          }
 
@@ -939,16 +947,11 @@ int OnCalculate(const int rates_total,
          for(int k = ArraySize(boxBear)-1; k>=0; k--) { if(boxBear[k].creation_time == time[i-2]) { idxRB = k; break; } if(ArraySize(boxBear)-k > 5) break; }
 
          if(bearScenB) {
-             if(idxRB == -1) {
+             if(idxRB == -1 && !IsDuplicateLocal(boxBear, time[i-2])) {
                  Local_OB newLoc; newLoc.top = rTopB; newLoc.bottom = rBotB; newLoc.is_mitigated = false; newLoc.mitigation_idx = 0; newLoc.creation_time = time[i-2];
                  newLoc.id = CreateBox(time[i-2], rTopB, time[i], rBotB, currentBearColor, "ob-" + tfTxt, clrWhite, "Local_Bear");
                  if(ArraySize(boxBear) >= 50) { DeleteLocalOB(boxBear[0]); ArrayRemove(boxBear, 0, 1); }
                  ArrayResize(boxBear, ArraySize(boxBear)+1); boxBear[ArraySize(boxBear)-1] = newLoc;
-             }
-         } else {
-             if(idxRB != -1) {
-                 DeleteLocalOB(boxBear[idxRB]);
-                 ArrayRemove(boxBear, idxRB, 1);
              }
          }
         }
