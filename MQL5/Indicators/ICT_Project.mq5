@@ -489,9 +489,6 @@ void ManageMTFObjects(string sym, ENUM_TIMEFRAMES tf, ENUM_TIMEFRAMES limitTf, d
    // `iTime(sym, tf, 0)` is the current (forming) bar.
    // If `iTime(0)` changes, it means a new bar started.
 
-   double h, l, o, c;
-   datetime t;
-
    // Helper to get Current HTF Time
    int shift = iBarShift(sym, tf, currTime, false);
    datetime thisBarTime = iTime(sym, tf, shift);
@@ -697,32 +694,32 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(rj == NULL) continue;
 
       bool isTouched = false;
-      if(rj.m_is_bearish)
+      if(rj->m_is_bearish)
         {
-         if(high >= rj.m_price) isTouched = true;
+         if(high >= rj->m_price) isTouched = true;
         }
       else
         {
-         if(low <= rj.m_price) isTouched = true;
+         if(low <= rj->m_price) isTouched = true;
         }
 
       // Immediate State Update
-      if(rj.m_mitigated_count == -1 && isTouched)
+      if(rj->m_mitigated_count == -1 && isTouched)
         {
-         rj.m_mitigated_count = 0;
+         rj->m_mitigated_count = 0;
         }
 
       bool readyToDelete = false;
-      if(rj.m_mitigated_count != -1)
+      if(rj->m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * rj.m_tf_ratio;
-         if(rj.m_mitigated_count >= scaledDelay)
+         double scaledDelay = InpMitigationDelay * rj->m_tf_ratio;
+         if(rj->m_mitigated_count >= scaledDelay)
            {
             readyToDelete = true;
            }
          else
            {
-            if(isConfirmed) rj.m_mitigated_count++;
+            if(isConfirmed) rj->m_mitigated_count++;
            }
         }
 
@@ -732,16 +729,16 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
         }
       else
         {
-         UpdateLineX2(rj.m_line_name, t);
-         UpdateLabelX(rj.m_label_name, t);
+         UpdateLineX2(rj->m_line_name, t);
+         UpdateLabelX(rj->m_label_name, t);
 
-         color finalColor = rj.m_is_bearish ? InpRJColorBear : InpRJColorBull;
-         if(rj.m_mitigated_count != -1) finalColor = InpMitigationColor;
+         color finalColor = rj->m_is_bearish ? InpRJColorBear : InpRJColorBull;
+         if(rj->m_mitigated_count != -1) finalColor = InpMitigationColor;
 
-         if(!rj.m_visible) finalColor = clrNone;
+         if(!rj->m_visible) finalColor = clrNone;
 
-         ObjectSetInteger(0, rj.m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, rj.m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, rj->m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, rj->m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
 
@@ -752,33 +749,33 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(sw == NULL) continue;
 
       bool isTouched = false;
-      if(sw.m_is_bearish) // High
-         if(high >= sw.m_price) isTouched = true;
+      if(sw->m_is_bearish) // High
+         if(high >= sw->m_price) isTouched = true;
       else
-         if(low <= sw.m_price) isTouched = true;
+         if(low <= sw->m_price) isTouched = true;
 
-      if(sw.m_mitigated_count == -1 && isTouched) sw.m_mitigated_count = 0;
+      if(sw->m_mitigated_count == -1 && isTouched) sw->m_mitigated_count = 0;
 
       bool readyToDelete = false;
-      if(sw.m_mitigated_count != -1)
+      if(sw->m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * sw.m_tf_ratio;
-         if(sw.m_mitigated_count >= scaledDelay) readyToDelete = true;
-         else if(isConfirmed) sw.m_mitigated_count++;
+         double scaledDelay = InpMitigationDelay * sw->m_tf_ratio;
+         if(sw->m_mitigated_count >= scaledDelay) readyToDelete = true;
+         else if(isConfirmed) sw->m_mitigated_count++;
         }
 
       if(readyToDelete) ListActiveMtfSwings.Delete(i);
       else
         {
-         UpdateLineX2(sw.m_line_name, t);
-         UpdateLabelX(sw.m_label_name, t);
+         UpdateLineX2(sw->m_line_name, t);
+         UpdateLabelX(sw->m_label_name, t);
 
-         color finalColor = sw.m_is_bearish ? InpMtfSwingColorHigh : InpMtfSwingColorLow;
-         if(sw.m_mitigated_count != -1) finalColor = InpMitigationColor;
-         if(!sw.m_visible) finalColor = clrNone;
+         color finalColor = sw->m_is_bearish ? InpMtfSwingColorHigh : InpMtfSwingColorLow;
+         if(sw->m_mitigated_count != -1) finalColor = InpMitigationColor;
+         if(!sw->m_visible) finalColor = clrNone;
 
-         ObjectSetInteger(0, sw.m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, sw.m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, sw->m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, sw->m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
 
@@ -789,32 +786,32 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(item == NULL) continue;
 
       bool isTouched = false;
-      if(item.m_is_bearish)
-         if(high >= item.m_price) isTouched = true;
+      if(item->m_is_bearish)
+         if(high >= item->m_price) isTouched = true;
       else
-         if(low <= item.m_price) isTouched = true;
+         if(low <= item->m_price) isTouched = true;
 
-      if(item.m_mitigated_count == -1 && isTouched) item.m_mitigated_count = 0;
+      if(item->m_mitigated_count == -1 && isTouched) item->m_mitigated_count = 0;
 
       bool readyToDelete = false;
-      if(item.m_mitigated_count != -1)
+      if(item->m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * item.m_tf_ratio;
-         if(item.m_mitigated_count >= scaledDelay) readyToDelete = true;
-         else if(isConfirmed) item.m_mitigated_count++;
+         double scaledDelay = InpMitigationDelay * item->m_tf_ratio;
+         if(item->m_mitigated_count >= scaledDelay) readyToDelete = true;
+         else if(isConfirmed) item->m_mitigated_count++;
         }
 
       if(readyToDelete) ListActiveMinorSwings.Delete(i);
       else
         {
-         UpdateLineX2(item.m_line_name, t);
-         UpdateLabelX(item.m_label_name, t);
+         UpdateLineX2(item->m_line_name, t);
+         UpdateLabelX(item->m_label_name, t);
 
-         color finalColor = item.m_is_bearish ? InpMinorColorHigh : InpMinorColorLow;
-         if(item.m_mitigated_count != -1) finalColor = InpMitigationColor;
+         color finalColor = item->m_is_bearish ? InpMinorColorHigh : InpMinorColorLow;
+         if(item->m_mitigated_count != -1) finalColor = InpMitigationColor;
 
-         ObjectSetInteger(0, item.m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, item.m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item->m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item->m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
 
@@ -825,33 +822,33 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(item == NULL) continue;
 
       bool isTouched = false;
-      if(item.m_is_bearish) // High
-         if(high >= item.m_price) isTouched = true;
+      if(item->m_is_bearish) // High
+         if(high >= item->m_price) isTouched = true;
       else
-         if(low <= item.m_price) isTouched = true;
+         if(low <= item->m_price) isTouched = true;
 
-      if(item.m_mitigated_count == -1 && isTouched) item.m_mitigated_count = 0;
+      if(item->m_mitigated_count == -1 && isTouched) item->m_mitigated_count = 0;
 
       bool readyToDelete = false;
-      if(item.m_mitigated_count != -1)
+      if(item->m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * item.m_tf_ratio;
-         if(item.m_mitigated_count >= scaledDelay) readyToDelete = true;
-         else if(isConfirmed) item.m_mitigated_count++;
+         double scaledDelay = InpMitigationDelay * item->m_tf_ratio;
+         if(item->m_mitigated_count >= scaledDelay) readyToDelete = true;
+         else if(isConfirmed) item->m_mitigated_count++;
         }
 
       if(readyToDelete) ListHistoryStructures.Delete(i);
       else
         {
-         UpdateLineX2(item.m_line_name, t);
-         UpdateLabelX(item.m_label_name, t);
+         UpdateLineX2(item->m_line_name, t);
+         UpdateLabelX(item->m_label_name, t);
 
-         color finalColor = item.m_is_bearish ? InpHistColorHigh : InpHistColorLow;
-         if(item.m_mitigated_count != -1) finalColor = InpMitigationColor;
+         color finalColor = item->m_is_bearish ? InpHistColorHigh : InpHistColorLow;
+         if(item->m_mitigated_count != -1) finalColor = InpMitigationColor;
          if(!InpShowHist) finalColor = clrNone;
 
-         ObjectSetInteger(0, item.m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, item.m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item->m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item->m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
   }
@@ -1358,18 +1355,18 @@ void DrawDashboard(double closePrice)
      {
       CRJO *rj = (CRJO*)ListActiveRJs.At(i);
       if(rj == NULL) continue;
-      double dist = MathAbs(closePrice - rj.m_price);
+      double dist = MathAbs(closePrice - rj->m_price);
       int idx = -1;
-      if(rj.m_tf_name == "W") idx = 0;
-      else if(rj.m_tf_name == "D") idx = 1;
-      else if(rj.m_tf_name == "4h") idx = 2;
+      if(rj->m_tf_name == "W") idx = 0;
+      else if(rj->m_tf_name == "D") idx = 1;
+      else if(rj->m_tf_name == "4h") idx = 2;
 
       if(idx != -1)
         {
-         if(rj.m_is_bearish) {
-            if(dist < resRJ[idx].bearDist) { resRJ[idx].bearDist = dist; resRJ[idx].bearPrice = rj.m_price; resRJ[idx].bearHunted = (rj.m_mitigated_count!=-1); }
+         if(rj->m_is_bearish) {
+            if(dist < resRJ[idx].bearDist) { resRJ[idx].bearDist = dist; resRJ[idx].bearPrice = rj->m_price; resRJ[idx].bearHunted = (rj->m_mitigated_count!=-1); }
          } else {
-            if(dist < resRJ[idx].bullDist) { resRJ[idx].bullDist = dist; resRJ[idx].bullPrice = rj.m_price; resRJ[idx].bullHunted = (rj.m_mitigated_count!=-1); }
+            if(dist < resRJ[idx].bullDist) { resRJ[idx].bullDist = dist; resRJ[idx].bullPrice = rj->m_price; resRJ[idx].bullHunted = (rj->m_mitigated_count!=-1); }
          }
         }
      }
@@ -1379,21 +1376,21 @@ void DrawDashboard(double closePrice)
      {
       CMtfSwingObj *sw = (CMtfSwingObj*)ListActiveMtfSwings.At(i);
       if(sw == NULL) continue;
-      double dist = MathAbs(closePrice - sw.m_price);
+      double dist = MathAbs(closePrice - sw->m_price);
       int idx = -1;
-      if(sw.m_tf_name == "W") idx = 0;
-      else if(sw.m_tf_name == "D") idx = 1;
-      else if(sw.m_tf_name == "4h") idx = 2;
-      else if(sw.m_tf_name == "1h") idx = 3;
-      else if(sw.m_tf_name == "30m") idx = 4;
-      else if(sw.m_tf_name == "15m") idx = 5;
+      if(sw->m_tf_name == "W") idx = 0;
+      else if(sw->m_tf_name == "D") idx = 1;
+      else if(sw->m_tf_name == "4h") idx = 2;
+      else if(sw->m_tf_name == "1h") idx = 3;
+      else if(sw->m_tf_name == "30m") idx = 4;
+      else if(sw->m_tf_name == "15m") idx = 5;
 
       if(idx != -1)
         {
-         if(sw.m_is_bearish) {
-            if(dist < resSw[idx].bearDist) { resSw[idx].bearDist = dist; resSw[idx].bearPrice = sw.m_price; resSw[idx].bearHunted = (sw.m_mitigated_count!=-1); }
+         if(sw->m_is_bearish) {
+            if(dist < resSw[idx].bearDist) { resSw[idx].bearDist = dist; resSw[idx].bearPrice = sw->m_price; resSw[idx].bearHunted = (sw->m_mitigated_count!=-1); }
          } else {
-            if(dist < resSw[idx].bullDist) { resSw[idx].bullDist = dist; resSw[idx].bullPrice = sw.m_price; resSw[idx].bullHunted = (sw.m_mitigated_count!=-1); }
+            if(dist < resSw[idx].bullDist) { resSw[idx].bullDist = dist; resSw[idx].bullPrice = sw->m_price; resSw[idx].bullHunted = (sw->m_mitigated_count!=-1); }
          }
         }
      }
@@ -1681,22 +1678,22 @@ int OnCalculate(const int rates_total,
         {
          CRJO *rj = (CRJO*)ListActiveRJs.At(k);
          if(rj == NULL) continue;
-         double dist = MathAbs(c - rj.m_price);
-         bool hunted = (rj.m_mitigated_count != -1);
+         double dist = MathAbs(c - rj->m_price);
+         bool hunted = (rj->m_mitigated_count != -1);
 
-         if(rj.m_tf_name == "W")
+         if(rj->m_tf_name == "W")
            {
-            if(rj.m_is_bearish) { if(dist < minBearDist_W) { minBearDist_W = dist; huntBear_W = hunted; } }
+            if(rj->m_is_bearish) { if(dist < minBearDist_W) { minBearDist_W = dist; huntBear_W = hunted; } }
             else { if(dist < minBullDist_W) { minBullDist_W = dist; huntBull_W = hunted; } }
            }
-         else if(rj.m_tf_name == "D")
+         else if(rj->m_tf_name == "D")
            {
-            if(rj.m_is_bearish) { if(dist < minBearDist_D) { minBearDist_D = dist; huntBear_D = hunted; } }
+            if(rj->m_is_bearish) { if(dist < minBearDist_D) { minBearDist_D = dist; huntBear_D = hunted; } }
             else { if(dist < minBullDist_D) { minBullDist_D = dist; huntBull_D = hunted; } }
            }
-         else if(rj.m_tf_name == "4h")
+         else if(rj->m_tf_name == "4h")
            {
-            if(rj.m_is_bearish) { if(dist < minBearDist_4H) { minBearDist_4H = dist; huntBear_4H = hunted; } }
+            if(rj->m_is_bearish) { if(dist < minBearDist_4H) { minBearDist_4H = dist; huntBear_4H = hunted; } }
             else { if(dist < minBullDist_4H) { minBullDist_4H = dist; huntBull_4H = hunted; } }
            }
         }
@@ -1728,38 +1725,38 @@ int OnCalculate(const int rates_total,
         {
          CMtfSwingObj *sw = (CMtfSwingObj*)ListActiveMtfSwings.At(k);
          if(sw == NULL) continue;
-         double dist = MathAbs(c - sw.m_price);
-         bool hunted = (sw.m_mitigated_count != -1);
-         string tf = sw.m_tf_name;
+         double dist = MathAbs(c - sw->m_price);
+         bool hunted = (sw->m_mitigated_count != -1);
+         string tf = sw->m_tf_name;
 
          if(tf == "W") {
-            if(sw.m_is_bearish) { if(dist < s_minBearDist_W) { s_minBearDist_W = dist; s_huntBear_W = hunted; } }
+            if(sw->m_is_bearish) { if(dist < s_minBearDist_W) { s_minBearDist_W = dist; s_huntBear_W = hunted; } }
             else { if(dist < s_minBullDist_W) { s_minBullDist_W = dist; s_huntBull_W = hunted; } }
          } else if(tf == "D") {
-            if(sw.m_is_bearish) { if(dist < s_minBearDist_D) { s_minBearDist_D = dist; s_huntBear_D = hunted; } }
+            if(sw->m_is_bearish) { if(dist < s_minBearDist_D) { s_minBearDist_D = dist; s_huntBear_D = hunted; } }
             else { if(dist < s_minBullDist_D) { s_minBullDist_D = dist; s_huntBull_D = hunted; } }
          } else if(tf == "4h") {
-            if(sw.m_is_bearish) {
+            if(sw->m_is_bearish) {
                if(dist < s_minBearDist_4H) {
                   s_minBearDist_4H = dist;
-                  s_bearPrice_4H = sw.m_price;
+                  s_bearPrice_4H = sw->m_price;
                   s_huntBear_4H = hunted;
                }
             } else {
                if(dist < s_minBullDist_4H) {
                   s_minBullDist_4H = dist;
-                  s_bullPrice_4H = sw.m_price;
+                  s_bullPrice_4H = sw->m_price;
                   s_huntBull_4H = hunted;
                }
             }
          } else if(tf == "1h") {
-            if(sw.m_is_bearish) { if(dist < s_minBearDist_1H) { s_minBearDist_1H = dist; s_huntBear_1H = hunted; } }
+            if(sw->m_is_bearish) { if(dist < s_minBearDist_1H) { s_minBearDist_1H = dist; s_huntBear_1H = hunted; } }
             else { if(dist < s_minBullDist_1H) { s_minBullDist_1H = dist; s_huntBull_1H = hunted; } }
          } else if(tf == "30m") {
-            if(sw.m_is_bearish) { if(dist < s_minBearDist_30m) { s_minBearDist_30m = dist; s_huntBear_30m = hunted; } }
+            if(sw->m_is_bearish) { if(dist < s_minBearDist_30m) { s_minBearDist_30m = dist; s_huntBear_30m = hunted; } }
             else { if(dist < s_minBullDist_30m) { s_minBullDist_30m = dist; s_huntBull_30m = hunted; } }
          } else if(tf == "15m") {
-            if(sw.m_is_bearish) { if(dist < s_minBearDist_15m) { s_minBearDist_15m = dist; s_huntBear_15m = hunted; } }
+            if(sw->m_is_bearish) { if(dist < s_minBearDist_15m) { s_minBearDist_15m = dist; s_huntBear_15m = hunted; } }
             else { if(dist < s_minBullDist_15m) { s_minBullDist_15m = dist; s_huntBull_15m = hunted; } }
          }
         }
