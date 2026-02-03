@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, Gemini AI"
 #property link      "https://www.google.com/"
-#property version   "6.07"
+#property version   "6.08"
 #property description "ICT Order Blocks - Delayed Deletion for Lines & Boxes"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -104,6 +104,7 @@ public:
    double            priceMid;       // For Lines
    datetime          timeStart;
    datetime          timeEnd;
+   datetime          timeBreakout;   // New: Time of the candle that confirmed the OB
    bool              isBullish;
 
    // General Mitigation (for Boxes)
@@ -136,7 +137,7 @@ public:
    bool              isActive;
    bool              isVisible;
 
-   COrderBlock() : priceTop(0), priceBottom(0), priceMid(0), timeStart(0),
+   COrderBlock() : priceTop(0), priceBottom(0), priceMid(0), timeStart(0), timeBreakout(0),
                    isBullish(false), isMitigated(false), isActive(true), isVisible(true),
                    mitigatedTop(false), mitigatedMid(false), mitigatedBot(false),
                    tMitTop(0), tMitMid(0), tMitBot(0) {}
@@ -367,6 +368,7 @@ void ScanForOBs(ENUM_TIMEFRAMES tf, CArrayObj &list, color cBull, color cBear)
       double obOpen = 0;
       double obClose = 0;
       datetime obTime = 0;
+      datetime breakoutTime = 0;
 
       // --- BULLISH OB LOGIC (Down Candle) ---
       if(rates[i].close < rates[i].open)
@@ -381,6 +383,10 @@ void ScanForOBs(ENUM_TIMEFRAMES tf, CArrayObj &list, color cBull, color cBear)
             obTime = rates[i].time;
             obOpen = rates[i].open;
             obClose = rates[i].close;
+
+            // Set Breakout Time (Open Time of the candle that broke structure)
+            if (breakOnNext) breakoutTime = rates[i-1].time;
+            else             breakoutTime = rates[i-2].time;
 
             // NEW LOGIC FOR H4 AND BELOW: Include Breakout Wicks
             if(tf <= PERIOD_H4)
@@ -412,6 +418,10 @@ void ScanForOBs(ENUM_TIMEFRAMES tf, CArrayObj &list, color cBull, color cBear)
             obOpen = rates[i].open;
             obClose = rates[i].close;
 
+            // Set Breakout Time
+            if (breakOnNext) breakoutTime = rates[i-1].time;
+            else             breakoutTime = rates[i-2].time;
+
             // NEW LOGIC FOR H4 AND BELOW
             if(tf <= PERIOD_H4)
               {
@@ -430,12 +440,12 @@ void ScanForOBs(ENUM_TIMEFRAMES tf, CArrayObj &list, color cBull, color cBear)
 
       if(found)
         {
-         AddOB(list, isBull, obTime, obTop, obBot, obOpen, obClose, tf, cBull, cBear);
+         AddOB(list, isBull, obTime, obTop, obBot, obOpen, obClose, tf, cBull, cBear, breakoutTime);
         }
      }
   }
 
-void AddOB(CArrayObj &list, bool bull, datetime t, double top, double bot, double open, double close, ENUM_TIMEFRAMES tf, color cbull, color cbear)
+void AddOB(CArrayObj &list, bool bull, datetime t, double top, double bot, double open, double close, ENUM_TIMEFRAMES tf, color cbull, color cbear, datetime brkTime)
   {
    // Dupe Check
    for(int i=0; i<list.Total(); i++) {
@@ -449,6 +459,7 @@ void AddOB(CArrayObj &list, bool bull, datetime t, double top, double bot, doubl
    ob.timeframe = tf;
    ob.cBull = cbull;
    ob.cBear = cbear;
+   ob.timeBreakout = brkTime;
 
    if(tf == PERIOD_D1 || tf == PERIOD_W1)
      {
@@ -497,10 +508,18 @@ void CheckMitigation(CArrayObj &list, ENUM_TIMEFRAMES tf)
    int effectiveDelay = (int)MathCeil(mitigationDelay * ratio);
    int effectiveDelaySeconds = effectiveDelay * PeriodSeconds(Period());
 
+   // Current time for valid mitigation check
+   datetime dtCurrent = iTime(Symbol(), PERIOD_CURRENT, 0);
+
    for(int i=0; i<list.Total(); i++)
      {
       COrderBlock *ob = list.At(i);
       if(!ob.isActive) continue;
+
+      // Safety: Only check for mitigation AFTER the breakout candle has closed.
+      // Breakout candle closes at: ob.timeBreakout + PeriodSeconds(ob.timeframe)
+      // We check if current time is past that point.
+      if (dtCurrent <= (ob.timeBreakout + PeriodSeconds(ob.timeframe))) continue;
 
       // A) OB_LINES (Independent Mitigation Logic)
       if(ob.visualType == OB_LINES)
