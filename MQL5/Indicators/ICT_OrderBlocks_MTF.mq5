@@ -307,7 +307,7 @@ void CalcOBLogic(string sym, ENUM_TIMEFRAMES tf, int shift,
 
 // --- Management Functions ---
 
-void ManageBoxes(Local_OB &boxesArray[], bool isBullish, double currentLow, double currentHigh, int currentBarIndex, datetime currentTime)
+void ManageBoxes(Local_OB &boxesArray[], bool isBullish, double currentLow, double currentHigh, int currentBarIndex, datetime currentTime, bool isLastBar)
   {
    int total = ArraySize(boxesArray);
    if(total == 0) return;
@@ -351,14 +351,14 @@ void ManageBoxes(Local_OB &boxesArray[], bool isBullish, double currentLow, doub
         }
       else
         {
-         // Extend to current time
-         if(ObjectFind(0, ob.id) >= 0)
+         // Extend to current time ONLY on last bar to prevent refresh lag during history calculation
+         if(isLastBar && ObjectFind(0, ob.id) >= 0)
             ObjectSetInteger(0, ob.id, OBJPROP_TIME, 1, currentTime);
         }
      }
   }
 
-void ManageMTF(MTF_OB &obArray[], bool isBullish, double currentLow, double currentHigh, int currentBarIndex, datetime currentTime, bool isDailyChart)
+void ManageMTF(MTF_OB &obArray[], bool isBullish, double currentLow, double currentHigh, int currentBarIndex, datetime currentTime, bool isDailyChart, bool isLastBar)
   {
    int total = ArraySize(obArray);
    if(total == 0) return;
@@ -403,7 +403,7 @@ void ManageMTF(MTF_OB &obArray[], bool isBullish, double currentLow, double curr
            }
          else
            {
-             if(ObjectFind(0, ob.b_main) >= 0)
+             if(isLastBar && ObjectFind(0, ob.b_main) >= 0)
                ObjectSetInteger(0, ob.b_main, OBJPROP_TIME, 1, currentTime);
            }
         }
@@ -429,8 +429,8 @@ void ManageMTF(MTF_OB &obArray[], bool isBullish, double currentLow, double curr
               }
             else
               {
-               if(ObjectFind(0, ob.l_1) >= 0) ObjectSetInteger(0, ob.l_1, OBJPROP_TIME, 1, currentTime);
-               if(ObjectFind(0, ob.lb_1) >= 0) ObjectSetInteger(0, ob.lb_1, OBJPROP_TIME, currentTime);
+               if(isLastBar && ObjectFind(0, ob.l_1) >= 0) ObjectSetInteger(0, ob.l_1, OBJPROP_TIME, 1, currentTime);
+               if(isLastBar && ObjectFind(0, ob.lb_1) >= 0) ObjectSetInteger(0, ob.lb_1, OBJPROP_TIME, currentTime);
                allLinesDeleted = false;
               }
            }
@@ -452,8 +452,8 @@ void ManageMTF(MTF_OB &obArray[], bool isBullish, double currentLow, double curr
               }
             else
               {
-               if(ObjectFind(0, ob.l_2) >= 0) ObjectSetInteger(0, ob.l_2, OBJPROP_TIME, 1, currentTime);
-               if(ObjectFind(0, ob.lb_2) >= 0) ObjectSetInteger(0, ob.lb_2, OBJPROP_TIME, currentTime);
+               if(isLastBar && ObjectFind(0, ob.l_2) >= 0) ObjectSetInteger(0, ob.l_2, OBJPROP_TIME, 1, currentTime);
+               if(isLastBar && ObjectFind(0, ob.lb_2) >= 0) ObjectSetInteger(0, ob.lb_2, OBJPROP_TIME, currentTime);
                allLinesDeleted = false;
               }
            }
@@ -475,8 +475,8 @@ void ManageMTF(MTF_OB &obArray[], bool isBullish, double currentLow, double curr
               }
             else
               {
-               if(ObjectFind(0, ob.l_3) >= 0) ObjectSetInteger(0, ob.l_3, OBJPROP_TIME, 1, currentTime);
-               if(ObjectFind(0, ob.lb_3) >= 0) ObjectSetInteger(0, ob.lb_3, OBJPROP_TIME, currentTime);
+               if(isLastBar && ObjectFind(0, ob.l_3) >= 0) ObjectSetInteger(0, ob.l_3, OBJPROP_TIME, 1, currentTime);
+               if(isLastBar && ObjectFind(0, ob.lb_3) >= 0) ObjectSetInteger(0, ob.lb_3, OBJPROP_TIME, currentTime);
                allLinesDeleted = false;
               }
            }
@@ -682,21 +682,22 @@ int OnCalculate(const int rates_total,
 
    for(int i = start; i < rates_total; i++)
      {
+      bool isLast = (i == rates_total - 1);
       // 1. Manage Existing Objects (Collision & Extension)
-      ManageBoxes(boxBull, true, low[i], high[i], i, time[i]);
-      ManageBoxes(boxBear, false, low[i], high[i], i, time[i]);
+      ManageBoxes(boxBull, true, low[i], high[i], i, time[i], isLast);
+      ManageBoxes(boxBear, false, low[i], high[i], i, time[i], isLast);
 
-      ManageMTF(lineBull1H, true, low[i], high[i], i, time[i], false);
-      ManageMTF(lineBear1H, false, low[i], high[i], i, time[i], false);
+      ManageMTF(lineBull1H, true, low[i], high[i], i, time[i], false, isLast);
+      ManageMTF(lineBear1H, false, low[i], high[i], i, time[i], false, isLast);
 
-      ManageMTF(lineBull4H, true, low[i], high[i], i, time[i], false);
-      ManageMTF(lineBear4H, false, low[i], high[i], i, time[i], false);
+      ManageMTF(lineBull4H, true, low[i], high[i], i, time[i], false, isLast);
+      ManageMTF(lineBear4H, false, low[i], high[i], i, time[i], false, isLast);
 
-      ManageMTF(lineBullD, true, low[i], high[i], i, time[i], true);
-      ManageMTF(lineBearD, false, low[i], high[i], i, time[i], true);
+      ManageMTF(lineBullD, true, low[i], high[i], i, time[i], true, isLast);
+      ManageMTF(lineBearD, false, low[i], high[i], i, time[i], true, isLast);
 
-      ManageMTF(lineBullW, true, low[i], high[i], i, time[i], true);
-      ManageMTF(lineBearW, false, low[i], high[i], i, time[i], true);
+      ManageMTF(lineBullW, true, low[i], high[i], i, time[i], true, isLast);
+      ManageMTF(lineBearW, false, low[i], high[i], i, time[i], true, isLast);
 
 
       // 2. MTF Logic Checks
