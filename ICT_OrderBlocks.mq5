@@ -147,10 +147,18 @@ public:
      {
       if(!isVisible || !isActive) { DeleteObjects(); return; }
 
+      // Safety: If box is mitigated, it MUST be deleted. No drawing allowed.
+      if(isMitigated && visualType == OB_RECTANGLE)
+      {
+         isVisible = false;
+         isActive = false;
+         DeleteObjects();
+         return;
+      }
+
       // Dynamic Extension: Alive -> Extend; Mitigated -> Stop at mitigationTime
       // NOTE: For lines, we extend until individual line mitigation time
       datetime dEnd = TimeCurrent() + PeriodSeconds()*10;
-      if(isMitigated && visualType == OB_RECTANGLE) dEnd = timeEnd;
 
       // Color Selection
       color c = isBullish ? cBull : cBear;
@@ -159,8 +167,6 @@ public:
       if(visualType == OB_RECTANGLE)
       {
          // Standard Box Logic
-         if(isMitigated) c = mitigatedColor;
-
          if(ObjectFind(0, objNameBox) < 0)
             ObjectCreate(0, objNameBox, OBJ_RECTANGLE, 0, timeStart, priceTop, dEnd, priceBottom);
 
