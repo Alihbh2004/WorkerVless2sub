@@ -413,82 +413,6 @@ void DeleteObj(string name)
 void ManageMTFObjects(string sym, ENUM_TIMEFRAMES tf, ENUM_TIMEFRAMES limitTf, datetime currTime,
                       StateBuffer &buf, bool forceCalc = false)
   {
-   // 1. Get HTF Data (completed bar, or current bar if we want real-time update of CURRENT candle,
-   // but logic requires checking shifts [0], [1], [2].
-   // Pine logic: checks 'isNewHtfBar'.
-   // If isNewHtfBar -> Push OLD [0] (which is now completed) to [1]?
-   // No, Pine 'request.security' returns the value at that moment.
-   // In loop, when 'htf_t' changes, it means we moved from one HTF bar to the next.
-   // The values 'srcH', 'srcL' etc passed to manage function in Pine are [1] (previous bar) for fixed TFs.
-   // Except for Local, where it uses current.
-
-   // We will implement the data fetching OUTSIDE this function (in OnCalculate) and pass the values.
-   // This function assumes it is called with the RELEVANT data point (e.g. previous completed HTF bar).
-   // Actually, to keep it self-contained like Pine's f_manage...:
-   // The Pine call: f_manage_mtf_objects("5", rj_5m_h[1], ... )
-   // It passes the PREVIOUS 5m bar data when a NEW 5m bar starts?
-   // No. 'request.security' array access [1].
-   // If we are at 10:00. rj_5m_t is 10:00. rj_5m_t[1] is 09:55.
-   // If we are at 10:01 (still inside 10:00 5m bar), rj_5m_t is 10:00.
-   // The check 'isNewHtfBar' uses `srcT != srcT[1]`.
-   // If we pass `rj_5m_t[1]` as `srcT`, we are checking if the *previous* 5m bar timestamp changed.
-   // This happens every time a NEW 5m bar completes.
-
-   // SIMPLIFICATION for MQL5:
-   // We will detect if the HTF bar index changed relative to the PREVIOUS executed LFT bar.
-   // But we iterate bar by bar.
-   // We need 'current' HTF time and 'previous' HTF time (from previous iteration).
-   // But `ManageMTFObjects` shouldn't manage the 'detection' of new bar based on args,
-   // instead we should detect new HTF bar in OnCalculate and then call this function
-   // to UPDATE the buffer and check for swings.
-
-   // Wait, Pine logic:
-   // f_manage... takes (srcH, srcL... srcT).
-   // It maintains its OWN buffers (bH, bL...) which are 'var'.
-   // `isNewBar := srcT != srcT[1]` (comparing the PASSED srcT with the PREVIOUSLY PASSED srcT?).
-   // Yes, because bT is a var array.
-   // BUT, `isNewBar` calculation in Pine: `if isLocal ... else srcT != srcT[1]`.
-   // Wait, checking `srcT != srcT[1]` inside the function in Pine checks if the *argument* `srcT` has changed since the *last execution* of the function? No.
-   // `srcT[1]` in Pine refers to the value of `srcT` on the previous bar of the CHART (1m).
-   // If `srcT` (the input) is the Time of the 5m bar.
-   // On 1m chart:
-   // 10:00 -> srcT = 10:00
-   // 10:01 -> srcT = 10:00
-   // ...
-   // 10:05 -> srcT = 10:05
-   // At 10:05, `srcT` (10:05) != `srcT[1]` (10:00). So `isNewBar` is true.
-   // This means we treat the 10:00 bar as "Finalized" and push it to our swing buffer.
-
-   // So in MQL5, we need to pass the *Current* HTF time for the bar we are processing.
-   // And check if it differs from the *Previous* HTF time we saw.
-   // But we don't have easy access to "Previous Chart Bar's HTF Time" unless we calculate it.
-   // Actually, `buf.t[0]` holds the LAST pushed HTF time.
-   // So if `currHtfTime != buf.t[0]`, it means we have a NEW HTF bar.
-   // THEN we push the *data of the bar that just finished*.
-   // Which is... wait.
-   // If we are at 10:05, `currHtfTime` is 10:05. `buf.t[0]` is 10:00.
-   // We pushed 10:00 at 10:00? No.
-   // When 10:00 started, `currHtfTime` was 10:00. `buf.t[0]` was 09:55.
-   // So we push 10:00? No, we assume the bar is *closed* to check for Swings?
-   // Pine logic:
-   // `array.push(bH, srcH)`.
-   // It pushes the `srcH` passed in.
-   // If we pass `rj_5m_h[1]` (which is the High of the *previous* 5m bar, i.e., completed),
-   // then when `srcT` changes (new 5m bar started), we push the *just completed* 5m bar.
-   // This seems correct for swing detection (which needs completed bars).
-
-   // Implementation:
-   // Get HTF Data for current time.
-   // Check if `Time != buf.t[0]`.
-   // If distinct:
-   //    Push `Time`, `High`, etc. into buffer.
-   //    Check Swings.
-
-   // BUT: We need the *Completed* bar data.
-   // `iHigh(sym, tf, 1)` is the previous (completed) bar.
-   // `iTime(sym, tf, 0)` is the current (forming) bar.
-   // If `iTime(0)` changes, it means a new bar started.
-
    // Helper to get Current HTF Time
    int shift = iBarShift(sym, tf, currTime, false);
    datetime thisBarTime = iTime(sym, tf, shift);
@@ -507,25 +431,6 @@ void ManageMTFObjects(string sym, ENUM_TIMEFRAMES tf, ENUM_TIMEFRAMES limitTf, d
       // The bar BEFORE 'thisBarTime' is the one that just completed.
       // We should have pushed the data for 'buf.t[2]' when it *started*?
       // No, we want to push the *Completed* data.
-
-      // Let's look at Pine again.
-      // `isNewBar := srcT != srcT[1]`.
-      // It pushes `srcH`.
-      // `srcH` is passed as `rj_5m_h[1]`.
-      // `rj_5m_h[1]` is the High of the 5m bar *before* the current one.
-      // At 10:05 (new bar start):
-      // Current 5m is 10:05. Previous (completed) is 10:00.
-      // `srcT` passed is `rj_5m_t[1]` -> 10:00.
-      // `srcT[1]` (prev 1m bar was 10:04) -> `rj_5m_t[1]` was 10:00.
-      // Wait. At 10:04, `rj_5m_t` (current) is 10:00. `rj_5m_t[1]` (10:00, index 1) is 09:55.
-      // The call `f_manage("5", ... rj_5m_t[1] ...)` passes 09:55.
-      // At 10:05: `rj_5m_t` is 10:05. `rj_5m_t[1]` is 10:00.
-      // The call passes 10:00.
-      // So `srcT` changed from 09:55 (at 10:04) to 10:00 (at 10:05).
-      // `isNewBar` is True.
-      // We push `srcH` (High of 10:00).
-      // So we are pushing the *Completed* bar 10:00 at 10:05.
-      // Correct.
 
       // So in MQL5:
       // We need to fetch the data for the *Previous* HTF bar relative to `currTime`.
@@ -694,32 +599,32 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(rj == NULL) continue;
 
       bool isTouched = false;
-      if(rj->m_is_bearish)
+      if(rj.m_is_bearish)
         {
-         if(high >= rj->m_price) isTouched = true;
+         if(high >= rj.m_price) isTouched = true;
         }
       else
         {
-         if(low <= rj->m_price) isTouched = true;
+         if(low <= rj.m_price) isTouched = true;
         }
 
       // Immediate State Update
-      if(rj->m_mitigated_count == -1 && isTouched)
+      if(rj.m_mitigated_count == -1 && isTouched)
         {
-         rj->m_mitigated_count = 0;
+         rj.m_mitigated_count = 0;
         }
 
       bool readyToDelete = false;
-      if(rj->m_mitigated_count != -1)
+      if(rj.m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * rj->m_tf_ratio;
-         if(rj->m_mitigated_count >= scaledDelay)
+         double scaledDelay = InpMitigationDelay * rj.m_tf_ratio;
+         if(rj.m_mitigated_count >= scaledDelay)
            {
             readyToDelete = true;
            }
          else
            {
-            if(isConfirmed) rj->m_mitigated_count++;
+            if(isConfirmed) rj.m_mitigated_count++;
            }
         }
 
@@ -729,16 +634,16 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
         }
       else
         {
-         UpdateLineX2(rj->m_line_name, t);
-         UpdateLabelX(rj->m_label_name, t);
+         UpdateLineX2(rj.m_line_name, t);
+         UpdateLabelX(rj.m_label_name, t);
 
-         color finalColor = rj->m_is_bearish ? InpRJColorBear : InpRJColorBull;
-         if(rj->m_mitigated_count != -1) finalColor = InpMitigationColor;
+         color finalColor = rj.m_is_bearish ? InpRJColorBear : InpRJColorBull;
+         if(rj.m_mitigated_count != -1) finalColor = InpMitigationColor;
 
-         if(!rj->m_visible) finalColor = clrNone;
+         if(!rj.m_visible) finalColor = clrNone;
 
-         ObjectSetInteger(0, rj->m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, rj->m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, rj.m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, rj.m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
 
@@ -749,33 +654,33 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(sw == NULL) continue;
 
       bool isTouched = false;
-      if(sw->m_is_bearish) // High
-         if(high >= sw->m_price) isTouched = true;
+      if(sw.m_is_bearish) // High
+         if(high >= sw.m_price) isTouched = true;
       else
-         if(low <= sw->m_price) isTouched = true;
+         if(low <= sw.m_price) isTouched = true;
 
-      if(sw->m_mitigated_count == -1 && isTouched) sw->m_mitigated_count = 0;
+      if(sw.m_mitigated_count == -1 && isTouched) sw.m_mitigated_count = 0;
 
       bool readyToDelete = false;
-      if(sw->m_mitigated_count != -1)
+      if(sw.m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * sw->m_tf_ratio;
-         if(sw->m_mitigated_count >= scaledDelay) readyToDelete = true;
-         else if(isConfirmed) sw->m_mitigated_count++;
+         double scaledDelay = InpMitigationDelay * sw.m_tf_ratio;
+         if(sw.m_mitigated_count >= scaledDelay) readyToDelete = true;
+         else if(isConfirmed) sw.m_mitigated_count++;
         }
 
       if(readyToDelete) ListActiveMtfSwings.Delete(i);
       else
         {
-         UpdateLineX2(sw->m_line_name, t);
-         UpdateLabelX(sw->m_label_name, t);
+         UpdateLineX2(sw.m_line_name, t);
+         UpdateLabelX(sw.m_label_name, t);
 
-         color finalColor = sw->m_is_bearish ? InpMtfSwingColorHigh : InpMtfSwingColorLow;
-         if(sw->m_mitigated_count != -1) finalColor = InpMitigationColor;
-         if(!sw->m_visible) finalColor = clrNone;
+         color finalColor = sw.m_is_bearish ? InpMtfSwingColorHigh : InpMtfSwingColorLow;
+         if(sw.m_mitigated_count != -1) finalColor = InpMitigationColor;
+         if(!sw.m_visible) finalColor = clrNone;
 
-         ObjectSetInteger(0, sw->m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, sw->m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, sw.m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, sw.m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
 
@@ -786,32 +691,32 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(item == NULL) continue;
 
       bool isTouched = false;
-      if(item->m_is_bearish)
-         if(high >= item->m_price) isTouched = true;
+      if(item.m_is_bearish)
+         if(high >= item.m_price) isTouched = true;
       else
-         if(low <= item->m_price) isTouched = true;
+         if(low <= item.m_price) isTouched = true;
 
-      if(item->m_mitigated_count == -1 && isTouched) item->m_mitigated_count = 0;
+      if(item.m_mitigated_count == -1 && isTouched) item.m_mitigated_count = 0;
 
       bool readyToDelete = false;
-      if(item->m_mitigated_count != -1)
+      if(item.m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * item->m_tf_ratio;
-         if(item->m_mitigated_count >= scaledDelay) readyToDelete = true;
-         else if(isConfirmed) item->m_mitigated_count++;
+         double scaledDelay = InpMitigationDelay * item.m_tf_ratio;
+         if(item.m_mitigated_count >= scaledDelay) readyToDelete = true;
+         else if(isConfirmed) item.m_mitigated_count++;
         }
 
       if(readyToDelete) ListActiveMinorSwings.Delete(i);
       else
         {
-         UpdateLineX2(item->m_line_name, t);
-         UpdateLabelX(item->m_label_name, t);
+         UpdateLineX2(item.m_line_name, t);
+         UpdateLabelX(item.m_label_name, t);
 
-         color finalColor = item->m_is_bearish ? InpMinorColorHigh : InpMinorColorLow;
-         if(item->m_mitigated_count != -1) finalColor = InpMitigationColor;
+         color finalColor = item.m_is_bearish ? InpMinorColorHigh : InpMinorColorLow;
+         if(item.m_mitigated_count != -1) finalColor = InpMitigationColor;
 
-         ObjectSetInteger(0, item->m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, item->m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item.m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item.m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
 
@@ -822,33 +727,33 @@ void ProcessMitigation(double high, double low, datetime t, bool isConfirmed)
       if(item == NULL) continue;
 
       bool isTouched = false;
-      if(item->m_is_bearish) // High
-         if(high >= item->m_price) isTouched = true;
+      if(item.m_is_bearish) // High
+         if(high >= item.m_price) isTouched = true;
       else
-         if(low <= item->m_price) isTouched = true;
+         if(low <= item.m_price) isTouched = true;
 
-      if(item->m_mitigated_count == -1 && isTouched) item->m_mitigated_count = 0;
+      if(item.m_mitigated_count == -1 && isTouched) item.m_mitigated_count = 0;
 
       bool readyToDelete = false;
-      if(item->m_mitigated_count != -1)
+      if(item.m_mitigated_count != -1)
         {
-         double scaledDelay = InpMitigationDelay * item->m_tf_ratio;
-         if(item->m_mitigated_count >= scaledDelay) readyToDelete = true;
-         else if(isConfirmed) item->m_mitigated_count++;
+         double scaledDelay = InpMitigationDelay * item.m_tf_ratio;
+         if(item.m_mitigated_count >= scaledDelay) readyToDelete = true;
+         else if(isConfirmed) item.m_mitigated_count++;
         }
 
       if(readyToDelete) ListHistoryStructures.Delete(i);
       else
         {
-         UpdateLineX2(item->m_line_name, t);
-         UpdateLabelX(item->m_label_name, t);
+         UpdateLineX2(item.m_line_name, t);
+         UpdateLabelX(item.m_label_name, t);
 
-         color finalColor = item->m_is_bearish ? InpHistColorHigh : InpHistColorLow;
-         if(item->m_mitigated_count != -1) finalColor = InpMitigationColor;
+         color finalColor = item.m_is_bearish ? InpHistColorHigh : InpHistColorLow;
+         if(item.m_mitigated_count != -1) finalColor = InpMitigationColor;
          if(!InpShowHist) finalColor = clrNone;
 
-         ObjectSetInteger(0, item->m_line_name, OBJPROP_COLOR, finalColor);
-         ObjectSetInteger(0, item->m_label_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item.m_line_name, OBJPROP_COLOR, finalColor);
+         ObjectSetInteger(0, item.m_label_name, OBJPROP_COLOR, finalColor);
         }
      }
   }
