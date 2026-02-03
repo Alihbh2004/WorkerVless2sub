@@ -19,8 +19,11 @@ input color defBearColor = clrMaroon;   // Default/Other TF Bear Color
 input color lineColor    = clrBlack;    // Daily/Weekly Line Color
 input int   lineWidth    = 1;           // Daily/Weekly Line Width
 input bool  showLabels   = true;        // Show Labels
-input int   maxActiveOBs = 20;          // Max Active Memory per TF (3-100)
-input int   visibleOBCount = 3;         // Visible Count (Last N) (1-20)
+input int   InpMaxActiveOBs = 20;       // Max Active Memory per TF (3-100)
+input int   InpVisibleOBCount = 3;      // Visible Count (Last N) (1-20)
+
+int maxActiveOBs;
+int visibleOBCount;
 input int   mitigationDelay = 3;        // Mitigation Delay (Candles) (0-50)
 input color mitigatedColor = clrGray;   // Mitigated Color
 
@@ -590,6 +593,9 @@ bool IsDuplicateMTF(MTF_OB &arr[], datetime t)
 int OnInit()
   {
    // Validate Inputs
+   maxActiveOBs = InpMaxActiveOBs;
+   visibleOBCount = InpVisibleOBCount;
+
    if(maxActiveOBs < 3) maxActiveOBs = 3;
    if(maxActiveOBs > 100) maxActiveOBs = 100;
 
@@ -849,7 +855,8 @@ int OnCalculate(const int rates_total,
         }
 
       // 3. Local OB Logic (Current Chart)
-      if(!isChartD && !isChartW)
+      // Strict adherence to barstate.isconfirmed: Only process finished bars
+      if(!isChartD && !isChartW && i < rates_total - 1)
         {
          string tfTxt = "";
          if(periodMin < 60) tfTxt = IntegerToString(periodMin) + "m"; else tfTxt = IntegerToString(periodMin/60) + "h";
@@ -954,11 +961,11 @@ int OnCalculate(const int rates_total,
    ManageVisibility(lineBull4H, show4H, minChart4H, maxChart4H, bullBox4H, bearBox4H);
    ManageVisibility(lineBear4H, show4H, minChart4H, maxChart4H, bullBox4H, bearBox4H);
 
-   ManageVisibility(lineBullD, showDaily, minChartD, maxChartD, clrNone, clrNone);
-   ManageVisibility(lineBearD, showDaily, minChartD, maxChartD, clrNone, clrNone);
+   ManageVisibility(lineBullD, showDaily, minChartD, maxChartD, clrNONE, clrNONE);
+   ManageVisibility(lineBearD, showDaily, minChartD, maxChartD, clrNONE, clrNONE);
 
-   ManageVisibility(lineBullW, showWeekly, minChartW, maxChartW, clrNone, clrNone);
-   ManageVisibility(lineBearW, showWeekly, minChartW, maxChartW, clrNone, clrNone);
+   ManageVisibility(lineBullW, showWeekly, minChartW, maxChartW, clrNONE, clrNONE);
+   ManageVisibility(lineBearW, showWeekly, minChartW, maxChartW, clrNONE, clrNONE);
 
    ManageLocalVisibility(boxBull, visibleOBCount, currentBullColor);
    ManageLocalVisibility(boxBear, visibleOBCount, currentBearColor);
